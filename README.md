@@ -1,26 +1,49 @@
 # ✈️ Airline Tweet Sentiment Analysis – End-to-End Pipeline
 ## 📊 Architecture Overview:
-pgsql
-Copy
-Edit
-[Twitter API]
-   ↓
-(Ingested via ADF Copy REST → Azure Blob Storage)
-   ↓
-[Azure Blob Storage]  ← Bronze (Raw JSON from Twitter API)
-   ↓
-[Azure Databricks]
-   - Extract tweet text from raw JSON
-   - Clean & preprocess text
-   ↓
- Silver Layer (Delta Table: Cleaned tweets)
-   - Contains only `text` column
-   ↓
- Gold Layer (Delta Table: Sentiment Predictions)
-   - `text` + `predicted_sentiment` using custom model
-   ↓
- Power BI
-   - Visualize tweet sentiment distribution and insights
+
+<pre> ┌─────────────────────────────┐ │ Twitter API (Search v2) │ └────────────┬────────────────┘ │ ▼ ┌─────────────────────────────────────────┐ │ Azure Data Factory (REST Copy Activity)│ │ - Polls Twitter API via Linked Service │ │ - Writes JSON to Blob Storage │ └────────────────┬────────────────────────┘ │ ▼ ┌──────────────────────────────────────────┐ │ Azure Blob Storage (Bronze Layer) │ │ - Raw JSON response from Twitter │ │ - Stored as tweets_bronze.json │ └────────────────┬─────────────────────────┘ │ ▼ ┌──────────────────────────────────────────┐ │ Azure Databricks (Bronze ➝ Silver) │ │ - Extracts & cleans tweet text │ │ - Removes special chars/emojis │ │ - Stores as Delta table │ │ tweets_silver │ └────────────────┬─────────────────────────┘ │ ▼ ┌──────────────────────────────────────────┐ │ Azure Databricks (Silver ➝ Gold) │ │ - Applies predict_sentiment(text) │ │ - Appends new column │ │ - Stores Gold as Delta table │ │ tweets_gold (text + sentiment) │ └────────────────┬─────────────────────────┘ │ ▼ ┌──────────────────────────────────────────┐ │ Power BI │ │ - Connects to Gold Delta layer │ │ - Visualizes: │ │ • Sentiment distribution │ │ • Word clouds, timelines │ │ • Common complaints │ └──────────────────────────────────────────┘ </pre>
+
+▼ Twitter API
+   - Twitter Search API v2 or recent tweets endpoint
+   - Provides tweets in JSON format
+
+▼ Azure Data Factory (ADF)
+   - REST Linked Service to Twitter API
+   - Copy Activity fetches tweets on schedule
+   - Stores raw tweet JSON in Azure Blob Storage
+
+▼ Azure Blob Storage (Bronze Layer)
+   - Stores raw JSON files from ADF
+   - Example: tweets_bronze.json
+
+▼ Azure Databricks (Bronze ➝ Silver)
+   - Reads raw JSON from Blob (Bronze)
+   - Extracts only 'text' field from each tweet
+   - Cleans data: removes nulls, emojis, unwanted characters
+   - Writes cleaned data as Delta table (Silver)
+
+▼ Delta Table: Silver Layer
+   - Contains only one column: 'text'
+   - Data stored in Delta format in Blob Storage
+
+▼ Azure Databricks (Silver ➝ Gold)
+   - Loads Silver Delta table
+   - Applies `predict_sentiment(text)` UDF
+   - Adds new column: 'predicted_sentiment'
+   - Writes enriched data as Gold Delta table
+
+▼ Delta Table: Gold Layer
+   - Columns: 'text', 'predicted_sentiment'
+   - Stored in Delta format in Blob Storage
+
+▼ Power BI
+   - Connects to Gold Delta (via CSV or Synapse / SQL Warehouse)
+   - Visualizes:
+     • Sentiment distribution (positive/negative/neutral)
+     • Most frequent complaint words
+     • Timeline of sentiment trends
+     • Filter by keywords or tweet content
+
 ## 📌 Project Description
 This project demonstrates an end-to-end data pipeline for Airline Tweet Sentiment Analysis, leveraging Azure Data Factory, Azure Blob Storage, Azure Databricks, and Power BI.
 
